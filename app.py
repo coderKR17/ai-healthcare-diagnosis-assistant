@@ -19,6 +19,13 @@ import streamlit as st
 from src.model import ModelTrainingError, train_model
 from src.predictor import PredictionError, predict_disease
 from src.patient import Patient, PatientValidationError
+from src.bmi import (
+    calculate_bmi,
+    get_bmi_category,
+    get_health_risk,
+    get_health_tip,
+    BMICalculationError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -184,6 +191,63 @@ def render_patient_information_section() -> None:
 
     st.divider()
 
+def render_bmi_section() -> None:
+    """Render the BMI and health risk assessment section.
+
+    Reads the previously saved patient data from ``st.session_state``,
+    calculates BMI, and displays the BMI value, category, associated
+    health risk, and a professional health tip.
+    """
+    st.header("📏 BMI & Health Risk Assessment")
+
+    patient = st.session_state.get("patient")
+
+    if patient is None:
+        st.warning(
+            "⚠️ No patient information found. Please fill out and save "
+            "the **Patient Information** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        bmi = calculate_bmi(
+            height_cm=patient.height_cm, weight_kg=patient.weight_kg
+        )
+        category = get_bmi_category(bmi)
+        risk = get_health_risk(bmi)
+        tip = get_health_tip(category)
+
+        st.success(f"✅ BMI assessment completed for **{patient.full_name}**.")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="BMI", value=f"{bmi:.2f}")
+        with col2:
+            st.metric(label="BMI Category", value=category)
+        with col3:
+            st.metric(label="Health Risk", value=risk)
+
+        st.info(f"💡 **Health Tip:** {tip}")
+
+        logger.info(
+            "BMI assessment displayed for '%s': BMI=%.2f, category=%s, "
+            "risk=%s",
+            patient.full_name,
+            bmi,
+            category,
+            risk,
+        )
+
+    except BMICalculationError as error:
+        st.error(f"BMI calculation failed: {error}")
+        logger.error("BMI calculation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(f"An unexpected error occurred during BMI assessment: {error}")
+        logger.exception("Unexpected error during BMI assessment.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -272,6 +336,7 @@ def main() -> None:
     render_header()
     render_sidebar()
     render_patient_information_section()
+    render_bmi_section()
     render_training_section()
     render_prediction_section()
 
