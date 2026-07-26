@@ -1,0 +1,281 @@
+"""Streamlit application for the AI-Powered Healthcare Diagnosis Assistant.
+
+This application provides a professional web interface that allows users to:
+    1. Train a RandomForestClassifier disease prediction model.
+    2. Select symptoms and predict the most likely disease.
+
+The application relies on the following independent, reusable modules:
+    - src.model: Handles dataset loading, validation, and model training.
+    - src.predictor: Handles trained model loading and disease prediction.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import pandas as pd
+import streamlit as st
+
+from src.model import ModelTrainingError, train_model
+from src.predictor import PredictionError, predict_disease
+from src.patient import Patient, PatientValidationError
+
+logger: logging.Logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+TRAINING_DATA_PATH: str = "data/Training.csv"
+TARGET_COLUMN: str = "prognosis"
+
+
+def configure_page() -> None:
+    """Configure Streamlit page settings such as title and layout."""
+    st.set_page_config(
+        page_title="AI-Powered Healthcare Diagnosis Assistant",
+        page_icon="🩺",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+
+
+def render_header() -> None:
+    """Render the project title and description on the main page."""
+    st.title("🩺 AI-Powered Healthcare Diagnosis Assistant")
+    st.markdown(
+        """
+        Welcome to the **AI-Powered Healthcare Diagnosis Assistant** — a
+        machine learning based tool that predicts possible diseases based
+        on the symptoms you provide.
+
+        Use the sections below to:
+        - **Train** the disease prediction model on the latest dataset.
+        - **Predict** a disease by selecting your symptoms.
+
+        > ⚠️ **Disclaimer:** This tool is for educational and informational
+        > purposes only and is **not** a substitute for professional
+        > medical advice, diagnosis, or treatment.
+        """
+    )
+    st.divider()
+
+
+def render_sidebar() -> None:
+    """Render the sidebar with project information and instructions."""
+    with st.sidebar:
+        st.header("About")
+        st.markdown(
+            """
+            **AI-Powered Healthcare Diagnosis Assistant** uses a
+            RandomForestClassifier trained on symptom-disease data to
+            predict likely diseases from user-selected symptoms.
+            """
+        )
+
+        st.header("How to Use")
+        st.markdown(
+            """
+            1. Click **Train Disease Prediction Model** to train the model
+               (only required once, or after updating the dataset).
+            2. Select your symptoms in the **Disease Prediction** section.
+            3. Click **Predict Disease** to view the result.
+            """
+        )
+
+        st.header("Project Info")
+        st.markdown(
+            """
+            - **Model:** RandomForestClassifier
+            - **Dataset:** `data/Training.csv`
+            - **Saved Model:** `models/disease_model.pkl`
+            """
+        )
+
+
+def render_training_section() -> None:
+    """Render the model training section and handle training actions."""
+    st.header("🧠 Train Disease Prediction Model")
+    st.write("Train the RandomForest model on the latest training dataset.")
+
+    if st.button("Train Disease Prediction Model"):
+        with st.spinner("Training model, please wait..."):
+            try:
+                accuracy = train_model()
+                st.success("✅ Model trained successfully!")
+                st.metric(
+                    label="Training Accuracy",
+                    value=f"{accuracy * 100:.2f}%",
+                )
+                logger.info("Model trained with accuracy: %.4f", accuracy)
+            except ModelTrainingError as error:
+                st.error(f"Model training failed: {error}")
+                logger.error("Model training failed: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(f"An unexpected error occurred during training: {error}")
+                logger.exception("Unexpected error during model training.")
+
+    st.divider()
+
+def render_patient_information_section() -> None:
+    """Render the patient information form and handle saving actions."""
+    st.header("🧾 Patient Information")
+    st.write("Please provide the patient's details below.")
+
+    with st.form(key="patient_information_form"):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            full_name = st.text_input("Full Name")
+            age = st.number_input(
+                "Age", min_value=1, max_value=120, value=25, step=1
+            )
+            gender = st.selectbox("Gender", options=["Male", "Female", "Other"])
+            height_cm = st.number_input(
+                "Height (cm)", min_value=50.0, max_value=250.0, value=170.0
+            )
+            weight_kg = st.number_input(
+                "Weight (kg)", min_value=2.0, max_value=300.0, value=65.0
+            )
+            blood_group = st.selectbox(
+                "Blood Group",
+                options=["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+            )
+
+        with col2:
+            allergies = st.text_area("Allergies", placeholder="e.g., Pollen, Dust")
+            existing_diseases = st.text_area(
+                "Existing Diseases", placeholder="e.g., Diabetes, Hypertension"
+            )
+            smoking = st.checkbox("Smoking")
+            alcohol = st.checkbox("Alcohol")
+            phone_number = st.text_input("Phone Number")
+            email = st.text_input("Email")
+
+        submitted = st.form_submit_button("Save Patient Information")
+
+    if submitted:
+        try:
+            patient = Patient(
+                full_name=full_name,
+                age=int(age),
+                gender=gender,
+                height_cm=float(height_cm),
+                weight_kg=float(weight_kg),
+                blood_group=blood_group,
+                allergies=allergies,
+                existing_diseases=existing_diseases,
+                smoking=smoking,
+                alcohol=alcohol,
+                phone_number=phone_number,
+                email=email,
+            )
+
+            st.session_state["patient"] = patient
+
+            st.success("✅ Patient information saved successfully!")
+            st.metric(label="BMI", value=f"{patient.calculate_bmi():.2f}")
+            st.metric(label="BMI Category", value=patient.bmi_category())
+            logger.info("Patient information saved for '%s'.", patient.full_name)
+
+        except PatientValidationError as error:
+            st.error(f"Patient validation failed: {error}")
+            logger.error("Patient validation failed: %s", error)
+        except Exception as error:  # noqa: BLE001
+            st.error(f"An unexpected error occurred while saving patient data: {error}")
+            logger.exception("Unexpected error while saving patient information.")
+
+    st.divider()
+
+
+def load_symptom_columns(data_path: str) -> list[str]:
+    """Load symptom column names from the training dataset.
+
+    Args:
+        data_path: Path to the training dataset CSV file.
+
+    Returns:
+        A list of symptom column names, excluding the target column.
+
+    Raises:
+        FileNotFoundError: If the dataset file does not exist.
+        ValueError: If the dataset is empty or malformed.
+    """
+    training_data = pd.read_csv(data_path)
+
+    if training_data.empty:
+        raise ValueError(f"Training data at '{data_path}' is empty.")
+
+    symptom_columns = [
+        column for column in training_data.columns if column != TARGET_COLUMN
+    ]
+
+    if not symptom_columns:
+        raise ValueError("No symptom columns found in training data.")
+
+    return symptom_columns
+
+
+def render_prediction_section() -> None:
+    """Render the disease prediction section and handle prediction actions."""
+    st.header("🔍 Disease Prediction")
+    st.write("Select your symptoms below to predict the possible disease.")
+
+    try:
+        symptom_columns = load_symptom_columns(TRAINING_DATA_PATH)
+    except FileNotFoundError:
+        st.error(f"Training data file not found at: {TRAINING_DATA_PATH}")
+        logger.error("Training data file not found at: %s", TRAINING_DATA_PATH)
+        return
+    except ValueError as error:
+        st.error(f"Failed to load symptom list: {error}")
+        logger.error("Failed to load symptom list: %s", error)
+        return
+    except Exception as error:  # noqa: BLE001
+        st.error(f"An unexpected error occurred while loading symptoms: {error}")
+        logger.exception("Unexpected error while loading symptoms.")
+        return
+
+    selected_symptoms = st.multiselect(
+        "Search and select your symptoms:",
+        options=symptom_columns,
+        help="Start typing to search for a symptom.",
+    )
+
+    if st.button("Predict Disease"):
+        if not selected_symptoms:
+            st.warning("Please select at least one symptom before predicting.")
+            return
+
+        with st.spinner("Predicting disease, please wait..."):
+            try:
+                symptoms_dict = {
+                    symptom: (1 if symptom in selected_symptoms else 0)
+                    for symptom in symptom_columns
+                }
+                predicted_disease = predict_disease(symptoms_dict)
+
+                st.success("✅ Prediction completed successfully!")
+                st.subheader("Predicted Disease")
+                st.write(predicted_disease)
+                logger.info("Predicted disease: %s", predicted_disease)
+            except PredictionError as error:
+                st.error(f"Prediction failed: {error}")
+                logger.error("Prediction failed: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(
+                    f"An unexpected error occurred during prediction: {error}"
+                )
+                logger.exception("Unexpected error during prediction.")
+
+
+def main() -> None:
+    """Run the Streamlit application."""
+    configure_page()
+    render_header()
+    render_sidebar()
+    render_patient_information_section()
+    render_training_section()
+    render_prediction_section()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    main()
