@@ -26,6 +26,10 @@ from src.bmi import (
     get_health_tip,
     BMICalculationError,
 )
+from src.medicine import (
+    get_medicine_recommendation,
+    MedicineRecommendationError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -248,6 +252,70 @@ def render_bmi_section() -> None:
 
     st.divider()
 
+def render_medicine_recommendation_section() -> None:
+    """Render the medicine recommendation section.
+
+    Reads the previously predicted disease from ``st.session_state`` and
+    displays commonly associated medicine categories and precautions for
+    educational purposes only.
+    """
+    st.header("💊 Medicine Recommendation")
+
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        recommendation = get_medicine_recommendation(predicted_disease)
+
+        st.success(
+            f"✅ Medicine recommendation retrieved for "
+            f"**{recommendation['disease']}**."
+        )
+
+        st.subheader("Disease")
+        st.write(recommendation["disease"])
+
+        st.subheader("Common Medicines")
+        medicines_markdown = "\n".join(
+            f"- {medicine}" for medicine in recommendation["common_medicines"]
+        )
+        st.markdown(medicines_markdown)
+
+        st.subheader("Precautions")
+        for precaution in recommendation["precautions"]:
+            st.info(f"🔹 {precaution}")
+
+        logger.info(
+            "Medicine recommendation displayed for disease: '%s'.",
+            recommendation["disease"],
+        )
+
+    except MedicineRecommendationError as error:
+        st.error(f"Medicine recommendation failed: {error}")
+        logger.error("Medicine recommendation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(
+            f"An unexpected error occurred while fetching medicine "
+            f"recommendations: {error}"
+        )
+        logger.exception("Unexpected error during medicine recommendation.")
+
+    st.warning(
+        "⚕️ **Medical Disclaimer:** This information is for educational "
+        "purposes only and does not constitute medical advice, diagnosis, "
+        "dosage guidance, or a prescription. Always consult a qualified "
+        "healthcare professional before taking any medication."
+    )
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -315,6 +383,7 @@ def render_prediction_section() -> None:
                     for symptom in symptom_columns
                 }
                 predicted_disease = predict_disease(symptoms_dict)
+                st.session_state["predicted_disease"] = predicted_disease
 
                 st.success("✅ Prediction completed successfully!")
                 st.subheader("Predicted Disease")
@@ -339,6 +408,7 @@ def main() -> None:
     render_bmi_section()
     render_training_section()
     render_prediction_section()
+    render_medicine_recommendation_section()
 
 
 if __name__ == "__main__":
