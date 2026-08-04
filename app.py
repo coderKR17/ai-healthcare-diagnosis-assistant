@@ -30,6 +30,10 @@ from src.medicine import (
     get_medicine_recommendation,
     MedicineRecommendationError,
 )
+from src.lab_tests import (
+    get_lab_test_recommendation,
+    LabTestRecommendationError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -316,6 +320,70 @@ def render_medicine_recommendation_section() -> None:
 
     st.divider()
 
+def render_lab_test_section() -> None:
+    """Render the recommended lab tests section.
+
+    Reads the previously predicted disease from ``st.session_state`` and
+    displays commonly recommended laboratory tests and their purpose for
+    educational purposes only.
+    """
+    st.header("🧪 Recommended Lab Tests")
+
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        recommendation = get_lab_test_recommendation(predicted_disease)
+
+        st.success(
+            f"✅ Lab test recommendations retrieved for "
+            f"**{recommendation['disease']}**."
+        )
+
+        st.subheader("Disease")
+        st.write(recommendation["disease"])
+
+        st.subheader("Recommended Tests")
+        tests_markdown = "\n".join(
+            f"- {test}" for test in recommendation["recommended_tests"]
+        )
+        st.markdown(tests_markdown)
+
+        st.subheader("Purpose of Each Test")
+        for purpose in recommendation["purpose"]:
+            st.info(f"🔹 {purpose}")
+
+        logger.info(
+            "Lab test recommendation displayed for disease: '%s'.",
+            recommendation["disease"],
+        )
+
+    except LabTestRecommendationError as error:
+        st.error(f"Lab test recommendation failed: {error}")
+        logger.error("Lab test recommendation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(
+            f"An unexpected error occurred while fetching lab test "
+            f"recommendations: {error}"
+        )
+        logger.exception("Unexpected error during lab test recommendation.")
+
+    st.warning(
+        "⚕️ **Disclaimer:** These lab test recommendations are for "
+        "educational purposes only and do not constitute a medical "
+        "diagnosis or treatment plan. Always consult a qualified "
+        "healthcare professional for actual testing and diagnosis."
+    )
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -409,6 +477,7 @@ def main() -> None:
     render_training_section()
     render_prediction_section()
     render_medicine_recommendation_section()
+    render_lab_test_section()
 
 
 if __name__ == "__main__":
