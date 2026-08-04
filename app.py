@@ -34,6 +34,12 @@ from src.lab_tests import (
     get_lab_test_recommendation,
     LabTestRecommendationError,
 )
+from src.history import (
+    create_history_record,
+    append_history,
+    clear_history,
+    HistoryError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -383,6 +389,46 @@ def render_lab_test_section() -> None:
     )
 
     st.divider()
+def render_history_section() -> None:
+    """Render the patient disease history section.
+
+    Displays all saved diagnosis history records from ``st.session_state``
+    and provides an option to clear the history.
+    """
+    st.header("📋 Patient Disease History")
+
+    history = st.session_state.get("history", [])
+
+    if not history:
+        st.info("ℹ️ No history records available yet.")
+        st.divider()
+        return
+
+    try:
+        for index, record in enumerate(reversed(history), start=1):
+            with st.expander(
+                f"{index}. {record.get('patient_name', 'Unknown')} — "
+                f"{record.get('disease', 'Unknown')}"
+            ):
+                st.write(f"**Patient Name:** {record.get('patient_name', '-')}")
+                st.write(f"**Disease:** {record.get('disease', '-')}")
+                st.write(f"**Symptoms:** {', '.join(record.get('symptoms', []))}")
+                st.write(f"**Date:** {record.get('date', '-')}")
+                st.write(f"**Time:** {record.get('time', '-')}")
+
+        if st.button("🗑️ Clear History"):
+            st.session_state["history"] = clear_history(history)
+            st.success("✅ History cleared successfully!")
+            logger.info("Patient disease history cleared by user.")
+
+    except HistoryError as error:
+        st.error(f"History operation failed: {error}")
+        logger.error("History operation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(f"An unexpected error occurred while displaying history: {error}")
+        logger.exception("Unexpected error while displaying history.")
+
+    st.divider()
 
 
 def load_symptom_columns(data_path: str) -> list[str]:
@@ -453,6 +499,29 @@ def render_prediction_section() -> None:
                 predicted_disease = predict_disease(symptoms_dict)
                 st.session_state["predicted_disease"] = predicted_disease
 
+                try:
+                    patient = st.session_state.get("patient")
+                    patient_name = patient.full_name if patient else "Unknown Patient"
+
+                    history_record = create_history_record(
+                        patient_name=patient_name,
+                        disease=predicted_disease,
+                        symptoms=selected_symptoms,
+                    )
+
+                    if "history" not in st.session_state:
+                        st.session_state["history"] = []
+
+                    st.session_state["history"] = append_history(
+                        st.session_state["history"], history_record
+                    )
+                    logger.info(
+                        "History record saved for patient '%s'.", patient_name
+                    )
+                except HistoryError as history_error:
+                    st.warning(f"Could not save history record: {history_error}")
+                    logger.error("Failed to save history record: %s", history_error)
+
                 st.success("✅ Prediction completed successfully!")
                 st.subheader("Predicted Disease")
                 st.write(predicted_disease)
@@ -478,6 +547,7 @@ def main() -> None:
     render_prediction_section()
     render_medicine_recommendation_section()
     render_lab_test_section()
+    render_history_section()
 
 
 if __name__ == "__main__":
