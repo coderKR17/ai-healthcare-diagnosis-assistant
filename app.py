@@ -44,6 +44,10 @@ from src.pdf_report import (
     generate_medical_report,
     PDFReportError,
 )
+from src.dashboard import (
+    generate_dashboard_summary,
+    DashboardError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -522,6 +526,80 @@ def render_pdf_report_section() -> None:
 
     st.divider()
 
+def render_dashboard_section() -> None:
+    """Render the health dashboard summary section.
+
+    Reads patient, predicted disease, and history data from
+    ``st.session_state``, calculates BMI, generates a consolidated
+    dashboard summary, and displays it using metric cards.
+    """
+    st.header("📊 Health Dashboard")
+
+    patient = st.session_state.get("patient")
+    predicted_disease = st.session_state.get("predicted_disease")
+    history = st.session_state.get("history", [])
+
+    if patient is None:
+        st.warning(
+            "⚠️ No patient information found. Please fill out the "
+            "**Patient Information** section first."
+        )
+        st.divider()
+        return
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        bmi_value = calculate_bmi(
+            height_cm=patient.height_cm, weight_kg=patient.weight_kg
+        )
+        bmi_category = get_bmi_category(bmi_value)
+
+        summary = generate_dashboard_summary(
+            patient=patient,
+            bmi_data={"bmi": bmi_value, "category": bmi_category},
+            predicted_disease=predicted_disease,
+            history=history,
+        )
+
+        st.success(f"✅ Dashboard summary generated for **{summary['patient_name']}**.")
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric(label="Patient Name", value=summary["patient_name"])
+            st.metric(label="Age", value=summary["age"])
+        with col2:
+            st.metric(label="Gender", value=summary["gender"])
+            st.metric(label="BMI", value=f"{summary['bmi']:.2f}")
+        with col3:
+            st.metric(label="BMI Category", value=summary["bmi_category"])
+            st.metric(label="Current Disease", value=summary["predicted_disease"])
+        with col4:
+            st.metric(label="Total History Records", value=summary["total_history"])
+
+        logger.info(
+            "Dashboard summary displayed for patient '%s'.",
+            summary["patient_name"],
+        )
+
+    except BMICalculationError as error:
+        st.error(f"BMI calculation failed: {error}")
+        logger.error("BMI calculation failed: %s", error)
+    except DashboardError as error:
+        st.error(f"Dashboard summary generation failed: {error}")
+        logger.error("Dashboard summary generation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(f"An unexpected error occurred while generating the dashboard: {error}")
+        logger.exception("Unexpected error during dashboard generation.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -641,6 +719,7 @@ def main() -> None:
     render_lab_test_section()
     render_history_section()
     render_pdf_report_section()
+    render_dashboard_section()
 
 
 if __name__ == "__main__":
