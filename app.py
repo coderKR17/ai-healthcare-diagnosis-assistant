@@ -40,6 +40,10 @@ from src.history import (
     clear_history,
     HistoryError,
 )
+from src.pdf_report import (
+    generate_medical_report,
+    PDFReportError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -430,6 +434,94 @@ def render_history_section() -> None:
 
     st.divider()
 
+def render_pdf_report_section() -> None:
+    """Render the PDF medical report generation and download section.
+
+    Reads patient, BMI, predicted disease, medicine, lab test, and history
+    data from ``st.session_state``, generates a consolidated PDF medical
+    report, and offers it to the user as a downloadable file.
+    """
+    st.header("📄 Download Medical Report")
+
+    patient = st.session_state.get("patient")
+    predicted_disease = st.session_state.get("predicted_disease")
+    history = st.session_state.get("history", [])
+
+    if patient is None:
+        st.warning(
+            "⚠️ No patient information found. Please fill out the "
+            "**Patient Information** section first."
+        )
+        st.divider()
+        return
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    if st.button("Generate Medical Report"):
+        with st.spinner("Generating medical report, please wait..."):
+            try:
+                bmi_value = calculate_bmi(
+                    height_cm=patient.height_cm, weight_kg=patient.weight_kg
+                )
+                bmi_category = get_bmi_category(bmi_value)
+                bmi_data = {
+                    "bmi": bmi_value,
+                    "category": bmi_category,
+                    "health_risk": get_health_risk(bmi_value),
+                    "health_tip": get_health_tip(bmi_category),
+                }
+
+                medicine_data = get_medicine_recommendation(predicted_disease)
+                lab_test_data = get_lab_test_recommendation(predicted_disease)
+
+                output_path = generate_medical_report(
+                    patient=patient,
+                    bmi_data=bmi_data,
+                    predicted_disease=predicted_disease,
+                    medicine_data=medicine_data,
+                    lab_test_data=lab_test_data,
+                    history=history,
+                    output_path="reports/medical_report.pdf",
+                )
+
+                st.success("✅ Medical report generated successfully!")
+                logger.info("Medical report generated at: %s", output_path)
+
+                with open(output_path, "rb") as report_file:
+                    st.download_button(
+                        label="⬇️ Download Medical Report",
+                        data=report_file.read(),
+                        file_name="medical_report.pdf",
+                        mime="application/pdf",
+                    )
+
+            except MedicineRecommendationError as error:
+                st.error(f"Medicine recommendation failed: {error}")
+                logger.error("Medicine recommendation failed: %s", error)
+            except LabTestRecommendationError as error:
+                st.error(f"Lab test recommendation failed: {error}")
+                logger.error("Lab test recommendation failed: %s", error)
+            except BMICalculationError as error:
+                st.error(f"BMI calculation failed: {error}")
+                logger.error("BMI calculation failed: %s", error)
+            except PDFReportError as error:
+                st.error(f"Report generation failed: {error}")
+                logger.error("Report generation failed: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(
+                    f"An unexpected error occurred while generating the "
+                    f"report: {error}"
+                )
+                logger.exception("Unexpected error during report generation.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -548,6 +640,7 @@ def main() -> None:
     render_medicine_recommendation_section()
     render_lab_test_section()
     render_history_section()
+    render_pdf_report_section()
 
 
 if __name__ == "__main__":
