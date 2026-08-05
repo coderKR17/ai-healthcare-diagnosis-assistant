@@ -48,6 +48,10 @@ from src.dashboard import (
     generate_dashboard_summary,
     DashboardError,
 )
+from src.doctor_recommendation import (
+    get_doctor_recommendation,
+    DoctorRecommendationError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -600,6 +604,81 @@ def render_dashboard_section() -> None:
 
     st.divider()
 
+def render_doctor_recommendation_section() -> None:
+    """Render the doctor recommendation section.
+
+    Reads the previously predicted disease from ``st.session_state`` and
+    displays the recommended doctor specialization, department, urgency
+    level, emergency status, and general advice.
+    """
+    st.header("👨‍⚕️ Doctor Recommendation")
+
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        recommendation = get_doctor_recommendation(predicted_disease)
+
+        st.success(
+            f"✅ Doctor recommendation retrieved for "
+            f"**{recommendation['disease']}**."
+        )
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="Disease", value=recommendation["disease"])
+        with col2:
+            st.metric(
+                label="Doctor Specialization",
+                value=recommendation["doctor_specialization"],
+            )
+        with col3:
+            st.metric(label="Hospital Department", value=recommendation["department"])
+
+        col4, col5 = st.columns(2)
+        with col4:
+            st.metric(label="Urgency Level", value=recommendation["urgency"])
+        with col5:
+            st.metric(
+                label="Emergency Status",
+                value="Yes" if recommendation["emergency"] else "No",
+            )
+
+        st.info(f"💡 **General Advice:** {recommendation['advice']}")
+
+        if recommendation["emergency"]:
+            st.error(
+                "🚨 **EMERGENCY:** This condition may require immediate "
+                "medical attention. Please seek emergency care or visit "
+                "the nearest hospital right away."
+            )
+
+        logger.info(
+            "Doctor recommendation displayed for disease: '%s' "
+            "(emergency=%s).",
+            recommendation["disease"],
+            recommendation["emergency"],
+        )
+
+    except DoctorRecommendationError as error:
+        st.error(f"Doctor recommendation failed: {error}")
+        logger.error("Doctor recommendation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(
+            f"An unexpected error occurred while fetching the doctor "
+            f"recommendation: {error}"
+        )
+        logger.exception("Unexpected error during doctor recommendation.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -720,6 +799,7 @@ def main() -> None:
     render_history_section()
     render_pdf_report_section()
     render_dashboard_section()
+    render_doctor_recommendation_section()
 
 
 if __name__ == "__main__":
