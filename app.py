@@ -52,6 +52,12 @@ from src.doctor_recommendation import (
     get_doctor_recommendation,
     DoctorRecommendationError,
 )
+from src.appointment import (
+    create_appointment,
+    append_appointment,
+    clear_appointments,
+    AppointmentError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -679,6 +685,131 @@ def render_doctor_recommendation_section() -> None:
 
     st.divider()
 
+def render_appointment_section() -> None:
+    """Render the appointment scheduling section.
+
+    Reads patient and predicted disease data from ``st.session_state``,
+    fetches a doctor recommendation, and allows the user to schedule and
+    manage appointments.
+    """
+    st.header("📅 Appointment Scheduler")
+
+    patient = st.session_state.get("patient")
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if patient is None:
+        st.warning(
+            "⚠️ No patient information found. Please fill out the "
+            "**Patient Information** section first."
+        )
+        st.divider()
+        return
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        recommendation = get_doctor_recommendation(predicted_disease)
+    except DoctorRecommendationError as error:
+        st.error(f"Doctor recommendation failed: {error}")
+        logger.error("Doctor recommendation failed: %s", error)
+        st.divider()
+        return
+    except Exception as error:  # noqa: BLE001
+        st.error(f"An unexpected error occurred while fetching the doctor recommendation: {error}")
+        logger.exception("Unexpected error during doctor recommendation lookup.")
+        st.divider()
+        return
+
+    with st.form(key="appointment_form"):
+        st.text_input("Patient Name", value=patient.full_name, disabled=True)
+        st.text_input(
+            "Doctor Specialization",
+            value=recommendation["doctor_specialization"],
+            disabled=True,
+        )
+        st.text_input("Department", value=recommendation["department"], disabled=True)
+
+        appointment_date = st.date_input("Appointment Date")
+        appointment_time = st.time_input("Appointment Time")
+        notes = st.text_area("Notes", placeholder="Optional additional notes")
+
+        submitted = st.form_submit_button("Schedule Appointment")
+
+    if submitted:
+        try:
+            appointment = create_appointment(
+                patient_name=patient.full_name,
+                doctor_specialization=recommendation["doctor_specialization"],
+                department=recommendation["department"],
+                appointment_date=appointment_date.strftime("%Y-%m-%d"),
+                appointment_time=appointment_time.strftime("%H:%M"),
+                notes=notes,
+            )
+
+            if "appointments" not in st.session_state:
+                st.session_state["appointments"] = []
+
+            st.session_state["appointments"] = append_appointment(
+                st.session_state["appointments"], appointment
+            )
+
+            st.success("✅ Appointment scheduled successfully!")
+            st.subheader("Appointment Summary")
+            st.write(f"**Patient Name:** {appointment['patient_name']}")
+            st.write(f"**Doctor Specialization:** {appointment['doctor_specialization']}")
+            st.write(f"**Department:** {appointment['department']}")
+            st.write(f"**Date:** {appointment['appointment_date']}")
+            st.write(f"**Time:** {appointment['appointment_time']}")
+            st.write(f"**Notes:** {appointment['notes'] or '-'}")
+
+            logger.info(
+                "Appointment scheduled for patient '%s' on %s at %s.",
+                appointment["patient_name"],
+                appointment["appointment_date"],
+                appointment["appointment_time"],
+            )
+
+        except AppointmentError as error:
+            st.error(f"Appointment scheduling failed: {error}")
+            logger.error("Appointment scheduling failed: %s", error)
+        except Exception as error:  # noqa: BLE001
+            st.error(f"An unexpected error occurred while scheduling the appointment: {error}")
+            logger.exception("Unexpected error during appointment scheduling.")
+
+    existing_appointments = st.session_state.get("appointments", [])
+    if existing_appointments:
+        st.subheader("Scheduled Appointments")
+        for index, appt in enumerate(existing_appointments, start=1):
+            with st.expander(
+                f"{index}. {appt.get('patient_name', '-')} — "
+                f"{appt.get('appointment_date', '-')} {appt.get('appointment_time', '-')}"
+            ):
+                st.write(f"**Doctor Specialization:** {appt.get('doctor_specialization', '-')}")
+                st.write(f"**Department:** {appt.get('department', '-')}")
+                st.write(f"**Notes:** {appt.get('notes', '-') or '-'}")
+
+        if st.button("🗑️ Clear Appointments"):
+            try:
+                st.session_state["appointments"] = clear_appointments(
+                    existing_appointments
+                )
+                st.success("✅ Appointments cleared successfully!")
+                logger.info("Appointments cleared by user.")
+            except AppointmentError as error:
+                st.error(f"Failed to clear appointments: {error}")
+                logger.error("Failed to clear appointments: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(f"An unexpected error occurred while clearing appointments: {error}")
+                logger.exception("Unexpected error while clearing appointments.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -800,6 +931,7 @@ def main() -> None:
     render_pdf_report_section()
     render_dashboard_section()
     render_doctor_recommendation_section()
+    render_appointment_section()
 
 
 if __name__ == "__main__":
