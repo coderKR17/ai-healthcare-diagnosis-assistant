@@ -58,6 +58,10 @@ from src.appointment import (
     clear_appointments,
     AppointmentError,
 )
+from src.health_tips import (
+    get_health_tips,
+    HealthTipsError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -810,6 +814,88 @@ def render_appointment_section() -> None:
 
     st.divider()
 
+def render_health_tips_section() -> None:
+    """Render the health tips and lifestyle recommendations section.
+
+    Reads patient and predicted disease data from ``st.session_state``,
+    calculates BMI and BMI category, and displays personalized diet,
+    exercise, sleep, hydration, lifestyle, and additional health tips.
+    """
+    st.header("🥗 Health Tips & Lifestyle Recommendations")
+
+    patient = st.session_state.get("patient")
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if patient is None:
+        st.warning(
+            "⚠️ No patient information found. Please fill out the "
+            "**Patient Information** section first."
+        )
+        st.divider()
+        return
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        bmi_value = calculate_bmi(
+            height_cm=patient.height_cm, weight_kg=patient.weight_kg
+        )
+        bmi_category = get_bmi_category(bmi_value)
+
+        tips = get_health_tips(
+            disease=predicted_disease,
+            bmi_category=bmi_category,
+        )
+
+        st.success(
+            f"✅ Health tips generated for **{predicted_disease}** "
+            f"(BMI Category: {bmi_category})."
+        )
+
+        st.subheader("🍎 Diet Recommendations")
+        st.markdown("\n".join(f"- {item}" for item in tips["diet"]))
+
+        st.subheader("🏃 Exercise Recommendations")
+        st.markdown("\n".join(f"- {item}" for item in tips["exercise"]))
+
+        st.subheader("😴 Sleep Recommendation")
+        st.info(tips["sleep"])
+
+        st.subheader("💧 Hydration Recommendation")
+        st.info(tips["hydration"])
+
+        st.subheader("🌿 Lifestyle Advice")
+        st.markdown("\n".join(f"- {item}" for item in tips["lifestyle"]))
+
+        st.subheader("📌 Additional Health Tips")
+        st.markdown("\n".join(f"- {item}" for item in tips["additional_tips"]))
+
+        logger.info(
+            "Health tips displayed for disease '%s' with BMI category '%s'.",
+            predicted_disease,
+            bmi_category,
+        )
+
+    except BMICalculationError as error:
+        st.error(f"BMI calculation failed: {error}")
+        logger.error("BMI calculation failed: %s", error)
+    except HealthTipsError as error:
+        st.error(f"Health tips generation failed: {error}")
+        logger.error("Health tips generation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(
+            f"An unexpected error occurred while generating health tips: {error}"
+        )
+        logger.exception("Unexpected error during health tips generation.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -932,6 +1018,7 @@ def main() -> None:
     render_dashboard_section()
     render_doctor_recommendation_section()
     render_appointment_section()
+    render_health_tips_section()
 
 
 if __name__ == "__main__":
