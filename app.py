@@ -62,6 +62,12 @@ from src.health_tips import (
     get_health_tips,
     HealthTipsError,
 )
+from src.auth import (
+    register_user,
+    login_user,
+    logout_user,
+    AuthenticationError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -98,6 +104,99 @@ def render_header() -> None:
         > medical advice, diagnosis, or treatment.
         """
     )
+    st.divider()
+
+def render_authentication_section() -> None:
+    """Render the user authentication section.
+
+    Maintains login state in ``st.session_state`` (``logged_in`` and
+    ``current_user`` only) and provides Register/Login tabs, plus a
+    welcome message and logout option once authenticated. User accounts
+    are persisted permanently by src.auth in data/users.json.
+    """
+    st.header("🔐 User Authentication")
+
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if "current_user" not in st.session_state:
+        st.session_state["current_user"] = None
+
+    if st.session_state["logged_in"]:
+        st.success(f"✅ Welcome back, **{st.session_state['current_user']}**!")
+        st.info(f"Logged in as: {st.session_state['current_user']}")
+
+        if st.button("Logout"):
+            try:
+                logout_user()
+                st.session_state["logged_in"] = False
+                st.session_state["current_user"] = None
+                st.success("✅ Logged out successfully!")
+                logger.info("User logged out and session state reset.")
+                st.rerun()
+            except Exception as error:  # noqa: BLE001
+                st.error(f"An unexpected error occurred during logout: {error}")
+                logger.exception("Unexpected error during logout.")
+
+        st.divider()
+        return
+
+    register_tab, login_tab = st.tabs(["Register", "Login"])
+
+    with register_tab:
+        st.subheader("Create a New Account")
+        register_username = st.text_input("Username", key="register_username")
+        register_password = st.text_input(
+            "Password", type="password", key="register_password"
+        )
+
+        if st.button("Register"):
+            try:
+                register_user(
+                    username=register_username,
+                    password=register_password,
+                )
+                st.success(
+                    f"✅ Account created successfully for "
+                    f"'{register_username.strip()}'. Please log in."
+                )
+                logger.info(
+                    "User '%s' registered successfully.", register_username.strip()
+                )
+            except AuthenticationError as error:
+                st.error(f"Registration failed: {error}")
+                logger.error("Registration failed: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(f"An unexpected error occurred during registration: {error}")
+                logger.exception("Unexpected error during registration.")
+
+    with login_tab:
+        st.subheader("Login to Your Account")
+        login_username = st.text_input("Username", key="login_username")
+        login_password = st.text_input(
+            "Password", type="password", key="login_password"
+        )
+
+        if st.button("Login"):
+            try:
+                is_authenticated = login_user(
+                    username=login_username,
+                    password=login_password,
+                )
+
+                if is_authenticated:
+                    st.session_state["logged_in"] = True
+                    st.session_state["current_user"] = login_username.strip()
+                    st.success(f"✅ Welcome, {login_username.strip()}!")
+                    logger.info(
+                        "User '%s' logged in successfully.", login_username.strip()
+                    )
+            except AuthenticationError as error:
+                st.error(f"Login failed: {error}")
+                logger.error("Login failed: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(f"An unexpected error occurred during login: {error}")
+                logger.exception("Unexpected error during login.")
+
     st.divider()
 
 
@@ -1006,6 +1105,11 @@ def main() -> None:
     """Run the Streamlit application."""
     configure_page()
     render_header()
+    render_authentication_section()
+
+    if not st.session_state.get("logged_in",False):
+        st.info("Please login to access the Healthcare Diagnosis Assistant.")
+        return
     render_sidebar()
     render_patient_information_section()
     render_bmi_section()

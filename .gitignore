@@ -16,3 +16,6 @@ models/
 # OS Files
 .DS_Store
 Thumbs.db
+
+# User Authentication Data
+data/users.json
