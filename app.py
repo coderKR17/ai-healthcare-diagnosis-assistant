@@ -15,6 +15,7 @@ import logging
 
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 
 from src.model import ModelTrainingError, train_model
 from src.predictor import PredictionError, predict_disease
@@ -67,6 +68,10 @@ from src.auth import (
     login_user,
     logout_user,
     AuthenticationError,
+)
+from src.email_report import (
+    send_medical_report,
+    EmailReportError,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -995,6 +1000,80 @@ def render_health_tips_section() -> None:
 
     st.divider()
 
+def render_email_report_section() -> None:
+    """Render the email medical report section.
+
+    Reads patient and predicted disease data from ``st.session_state``,
+    verifies the generated PDF report exists, and emails it to the
+    patient using SMTP credentials provided by the user.
+    """
+    st.header("📧 Email Medical Report")
+
+    patient = st.session_state.get("patient")
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if patient is None:
+        st.warning(
+            "⚠️ No patient information found. Please fill out the "
+            "**Patient Information** section first."
+        )
+        st.divider()
+        return
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    report_path = Path("reports/medical_report.pdf")
+
+    if not report_path.exists():
+        st.warning(
+            "⚠️ No medical report found. Please generate the report in "
+            "the **Download Medical Report** section first."
+        )
+        st.divider()
+        return
+
+    with st.form(key="email_report_form"):
+        recipient_email = st.text_input("Recipient Email")
+        sender_email = st.text_input("Sender Email")
+        sender_password = st.text_input("Sender App Password", type="password")
+
+        submitted = st.form_submit_button("Send Medical Report")
+
+    if submitted:
+        with st.spinner("Sending medical report, please wait..."):
+            try:
+                send_medical_report(
+                    recipient_email=recipient_email,
+                    pdf_path=str(report_path),
+                    sender_email=sender_email,
+                    sender_password=sender_password,
+                )
+                st.success(
+                    f"✅ Medical report emailed successfully to "
+                    f"{recipient_email.strip()}!"
+                )
+                logger.info(
+                    "Medical report emailed successfully to: %s",
+                    recipient_email.strip(),
+                )
+            except EmailReportError as error:
+                st.error(f"Failed to send medical report: {error}")
+                logger.error("Failed to send medical report: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(
+                    f"An unexpected error occurred while sending the "
+                    f"medical report: {error}"
+                )
+                logger.exception("Unexpected error while sending medical report.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -1123,6 +1202,7 @@ def main() -> None:
     render_doctor_recommendation_section()
     render_appointment_section()
     render_health_tips_section()
+    render_email_report_section()
 
 
 if __name__ == "__main__":
