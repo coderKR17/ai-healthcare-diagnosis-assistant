@@ -77,6 +77,10 @@ from src.hospital_finder import (
     get_hospital_recommendation,
     HospitalFinderError,
 )
+from src.health_chatbot import (
+    get_chatbot_response,
+    HealthChatbotError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -1143,6 +1147,88 @@ def render_hospital_finder_section() -> None:
 
     st.divider()
 
+def render_health_chatbot_section() -> None:
+    """Render the AI health chatbot section.
+
+    Reads the predicted disease and patient data from
+    ``st.session_state`` to personalize responses, calculates BMI when
+    patient data is available, and lets the user ask general health
+    questions to a rule-based (or optionally AI-backed) chatbot.
+    """
+    st.header("🤖 AI Health Chatbot")
+
+    predicted_disease = st.session_state.get("predicted_disease")
+    patient = st.session_state.get("patient")
+
+    bmi_value: float | None = None
+    if patient is not None:
+        try:
+            bmi_value = calculate_bmi(
+                height_cm=patient.height_cm, weight_kg=patient.weight_kg
+            )
+        except BMICalculationError as error:
+            st.warning(f"Could not calculate BMI for chatbot context: {error}")
+            logger.error("BMI calculation failed in chatbot section: %s", error)
+            bmi_value = None
+
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = []
+
+    user_message = st.text_area(
+        "Ask a health question",
+        placeholder="e.g., What should I eat for diabetes?",
+        key="chatbot_user_message",
+    )
+
+    if st.button("Ask Health Assistant"):
+        if not user_message or not user_message.strip():
+            st.warning("⚠️ Please enter a question before submitting.")
+        else:
+            try:
+                response = get_chatbot_response(
+                    user_message=user_message,
+                    predicted_disease=predicted_disease,
+                    bmi=bmi_value,
+                )
+
+                st.session_state["chat_history"].append(
+                    {"user": user_message.strip(), "assistant": response}
+                )
+
+                st.success("✅ Response generated successfully!")
+                st.info(response)
+
+                logger.info("Chatbot response generated successfully.")
+
+            except HealthChatbotError as error:
+                st.error(f"Chatbot could not process your question: {error}")
+                logger.error("Chatbot response generation failed: %s", error)
+            except Exception as error:  # noqa: BLE001
+                st.error(
+                    f"An unexpected error occurred while generating the "
+                    f"chatbot response: {error}"
+                )
+                logger.exception("Unexpected error during chatbot response generation.")
+
+    chat_history = st.session_state.get("chat_history", [])
+    if chat_history:
+        st.subheader("Conversation History")
+        for index, entry in enumerate(reversed(chat_history), start=1):
+            with st.expander(f"{index}. {entry.get('user', '-')[:60]}"):
+                st.write(f"**You:** {entry.get('user', '-')}")
+                st.write(f"**Assistant:** {entry.get('assistant', '-')}")
+
+    st.warning(
+        "⚕️ **Medical Disclaimer:** This chatbot provides general "
+        "educational information only and does not offer a medical "
+        "diagnosis. Any medicine information shared is not a "
+        "prescription. Please consult a qualified healthcare "
+        "professional for personalized advice. If you are experiencing "
+        "emergency symptoms, seek immediate professional medical care."
+    )
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -1273,6 +1359,7 @@ def main() -> None:
     render_health_tips_section()
     render_email_report_section()
     render_hospital_finder_section()
+    render_health_chatbot_section()
 
 
 if __name__ == "__main__":
