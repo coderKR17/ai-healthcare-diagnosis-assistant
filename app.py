@@ -73,6 +73,10 @@ from src.email_report import (
     send_medical_report,
     EmailReportError,
 )
+from src.hospital_finder import (
+    get_hospital_recommendation,
+    HospitalFinderError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -1074,6 +1078,71 @@ def render_email_report_section() -> None:
 
     st.divider()
 
+def render_hospital_finder_section() -> None:
+    """Render the hospital finder section.
+
+    Reads the previously predicted disease from ``st.session_state`` and
+    displays a recommended hospital, including department, address,
+    contact information, emergency status, and a Google Maps link.
+    """
+    st.header("🏥 Hospital Finder")
+
+    predicted_disease = st.session_state.get("predicted_disease")
+
+    if not predicted_disease:
+        st.warning(
+            "⚠️ No predicted disease found. Please predict a disease in "
+            "the **Disease Prediction** section first."
+        )
+        st.divider()
+        return
+
+    try:
+        recommendation = get_hospital_recommendation(predicted_disease)
+
+        st.success(
+            f"✅ Hospital recommendation retrieved for "
+            f"**{recommendation['disease']}**."
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(label="Hospital Name", value=recommendation["hospital_name"])
+        with col2:
+            st.metric(label="Department", value=recommendation["department"])
+
+        st.info(f"📍 **Address:** {recommendation['address']}")
+        st.info(f"📞 **Contact Number:** {recommendation['contact_number']}")
+
+        if recommendation["emergency"]:
+            st.error(
+                "🚨 **Emergency Hospital Support Available** — This "
+                "hospital offers emergency care for this condition."
+            )
+        else:
+            st.info("ℹ️ This hospital does not offer emergency care for this condition.")
+
+        st.link_button("📍 View on Google Maps", recommendation["maps_link"])
+
+        logger.info(
+            "Hospital recommendation displayed for disease: '%s' "
+            "(emergency=%s).",
+            recommendation["disease"],
+            recommendation["emergency"],
+        )
+
+    except HospitalFinderError as error:
+        st.error(f"Hospital recommendation failed: {error}")
+        logger.error("Hospital recommendation failed: %s", error)
+    except Exception as error:  # noqa: BLE001
+        st.error(
+            f"An unexpected error occurred while fetching the hospital "
+            f"recommendation: {error}"
+        )
+        logger.exception("Unexpected error during hospital recommendation.")
+
+    st.divider()
+
 
 def load_symptom_columns(data_path: str) -> list[str]:
     """Load symptom column names from the training dataset.
@@ -1203,6 +1272,7 @@ def main() -> None:
     render_appointment_section()
     render_health_tips_section()
     render_email_report_section()
+    render_hospital_finder_section()
 
 
 if __name__ == "__main__":
