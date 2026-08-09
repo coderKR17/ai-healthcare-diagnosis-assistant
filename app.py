@@ -20,6 +20,7 @@ from pathlib import Path
 from src.model import ModelTrainingError, train_model
 from src.predictor import PredictionError, predict_disease
 from src.patient import Patient, PatientValidationError
+from src.ui_style import apply_premium_style
 from src.bmi import (
     calculate_bmi,
     get_bmi_category,
@@ -1338,6 +1339,7 @@ def render_prediction_section() -> None:
 def main() -> None:
     """Run the Streamlit application."""
     configure_page()
+    apply_premium_style()
     render_header()
     render_authentication_section()
 
