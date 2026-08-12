@@ -11,226 +11,216 @@ logger.addHandler(logging.NullHandler())
 _PREMIUM_CSS: str = """
 <style>
 
-    /* =========================================================
-       GLOBAL APP
-       ========================================================= */
+:root {
+    --hc-primary: #2563A8;
+    --hc-primary-hover: #1E4E86;
+    --hc-accent: #0FA3A3;
+    --hc-bg: #F5F8FB;
+    --hc-surface: #FFFFFF;
+    --hc-border: #E2E8F0;
+    --hc-text: #1E293B;
+    --hc-muted: #64748B;
+    --hc-success: #16A34A;
+    --hc-warning: #D97706;
+    --hc-danger: #DC2626;
+    --hc-radius: 10px;
+    --hc-radius-sm: 7px;
+}
 
-    .stApp {
-        background: #f5f8fb;
-        color: #1e293b;
+/* Main application background */
+.stApp {
+    background-color: var(--hc-bg);
+    color: var(--hc-text);
+    overflow-x: hidden;
+}
+
+/* Main content */
+.main {
+    color: var(--hc-text);
+}
+
+/* Headings */
+.main h1,
+.main h2,
+.main h3,
+.main h4 {
+    color: var(--hc-text) !important;
+}
+
+/* Normal text */
+.main p,
+.main label,
+.main span {
+    color: var(--hc-text);
+}
+
+/* Input fields */
+.stTextInput input,
+.stNumberInput input,
+.stTextArea textarea {
+    background-color: #FFFFFF !important;
+    color: #1E293B !important;
+    caret-color: #2563A8 !important;
+}
+
+/* Input placeholder text */
+.stTextInput input::placeholder,
+.stNumberInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: #64748B !important;
+    opacity: 1 !important;
+}
+
+/* Select boxes */
+[data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    color: #1E293B !important;
+}
+
+[data-baseweb="select"] span {
+    color: #1E293B !important;
+}
+
+/* Text area */
+.stTextArea textarea {
+    min-height: 90px;
+}
+
+/* Checkboxes */
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] label span {
+    color: #1E293B !important;
+}
+
+/* Buttons */
+.stButton > button,
+.stFormSubmitButton > button {
+    background-color: var(--hc-primary);
+    color: #FFFFFF !important;
+    border: 1px solid var(--hc-primary);
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.stButton > button:hover,
+.stFormSubmitButton > button:hover {
+    background-color: var(--hc-primary-hover);
+    color: #FFFFFF !important;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #FFFFFF;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    padding-top: 1.25rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+[data-testid="stSidebar"] h1 {
+    color: var(--hc-text) !important;
+    font-size: 1.3rem;
+    border-bottom: 2px solid var(--hc-border);
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.9rem;
+}
+
+[data-testid="stSidebar"] h2 {
+    color: var(--hc-primary) !important;
+    font-size: 1.02rem;
+    margin-top: 1.4rem;
+    margin-bottom: 0.5rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--hc-border);
+}
+
+[data-testid="stSidebar"] hr {
+    border-top: 1px solid var(--hc-border);
+}
+
+/* Section headers */
+.main h2 {
+    display: block;
+    background-color: var(--hc-surface);
+    color: var(--hc-text) !important;
+    border: 1px solid var(--hc-border);
+    border-left: 4px solid var(--hc-primary);
+    border-radius: var(--hc-radius-sm);
+    padding: 0.65rem 1rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+/* Tabs */
+[data-baseweb="tab-list"] {
+    background-color: #FFFFFF;
+    border: 1px solid var(--hc-border);
+    border-radius: var(--hc-radius-sm);
+    padding: 0.25rem;
+    gap: 0.25rem;
+}
+
+[data-baseweb="tab"] {
+    color: var(--hc-text) !important;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+}
+
+[aria-selected="true"][data-baseweb="tab"] {
+    background-color: var(--hc-bg);
+    color: var(--hc-primary) !important;
+    box-shadow: inset 0 0 0 1px var(--hc-primary);
+}
+
+/* Forms / Cards */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #FFFFFF;
+    border: 1px solid var(--hc-border) !important;
+    border-radius: var(--hc-radius) !important;
+    padding: 0.5rem 0.25rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    margin-bottom: 1rem;
+}
+
+/* Alerts */
+[data-testid="stAlert"] {
+    color: var(--hc-text);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+
+    [data-testid="stSidebar"] > div:first-child {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 
-    .main .block-container {
-        max-width: 1200px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
+    .main h2 {
+        padding: 0.5rem 0.75rem;
+        margin-top: 1.4rem;
     }
 
-    /* =========================================================
-       HEADINGS
-       ========================================================= */
-
-    h1, h2, h3, h4 {
-        color: #1e293b;
-        font-weight: 700;
+    .stButton > button,
+    .stFormSubmitButton > button {
+        width: 100%;
     }
 
-    h1 {
-        letter-spacing: -0.5px;
+    [data-testid="column"] {
+        min-width: 100% !important;
     }
-
-    /* =========================================================
-       SIDEBAR
-       ========================================================= */
-
-    section[data-testid="stSidebar"] {
-        background: #ffffff;
-        border-right: 1px solid #e2e8f0;
-    }
-
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: #2563a8;
-    }
-
-    /* =========================================================
-       BUTTONS
-       ========================================================= */
-
-    .stButton > button {
-        background: #2563a8;
-        color: #ffffff;
-        border: none;
-        border-radius: 10px;
-        padding: 0.55rem 1.1rem;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        min-height: 42px;
-    }
-
-    .stButton > button:hover {
-        background: #1e4e86;
-        color: #ffffff;
-        border: none;
-        transform: translateY(-1px);
-    }
-
-    .stButton > button:focus {
-        box-shadow: 0 0 0 2px rgba(37, 99, 168, 0.25);
-    }
-
-    /* =========================================================
-       INPUTS
-       ========================================================= */
-
-    .stTextInput input,
-    .stTextArea textarea,
-    .stNumberInput input {
-        border: 1px solid #cbd5e1;
-        border-radius: 10px;
-        background: #ffffff;
-    }
-
-    .stTextInput input:focus,
-    .stTextArea textarea:focus,
-    .stNumberInput input:focus {
-        border-color: #2563a8;
-        box-shadow: 0 0 0 1px #2563a8;
-    }
-
-    /* =========================================================
-       SELECT BOXES
-       ========================================================= */
-
-    div[data-baseweb="select"] > div {
-        border-radius: 10px;
-        border-color: #cbd5e1;
-        background: #ffffff;
-    }
-
-    /* =========================================================
-       METRIC CARDS
-       ========================================================= */
-
-    div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-    }
-
-    div[data-testid="stMetricLabel"] {
-        color: #64748b;
-    }
-
-    div[data-testid="stMetricValue"] {
-        color: #2563a8;
-        font-weight: 700;
-    }
-
-    /* =========================================================
-       ALERT / MESSAGE BOXES
-       ========================================================= */
-
-    div[data-testid="stAlert"] {
-        border-radius: 12px;
-        border-width: 1px;
-    }
-
-    /* =========================================================
-       EXPANDERS
-       ========================================================= */
-
-    details {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        margin-bottom: 0.75rem;
-    }
-
-    details summary {
-        font-weight: 600;
-        color: #1e293b;
-    }
-
-    /* =========================================================
-       TABS
-       ========================================================= */
-
-    button[data-baseweb="tab"] {
-        font-weight: 600;
-    }
-
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #2563a8;
-    }
-
-    /* =========================================================
-       DIVIDERS
-       ========================================================= */
-
-    hr {
-        border-color: #e2e8f0;
-        margin-top: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-
-    /* =========================================================
-       FORM CONTAINERS
-       ========================================================= */
-
-    div[data-testid="stForm"] {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 1.25rem;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
-
-    /* =========================================================
-       LINKS
-       ========================================================= */
-
-    a {
-        color: #2563a8;
-        font-weight: 600;
-    }
-
-    /* =========================================================
-       RESPONSIVE DESIGN
-       ========================================================= */
-
-    @media (max-width: 768px) {
-
-        .main .block-container {
-            padding-left: 1rem;
-            padding-right: 1rem;
-            padding-top: 1rem;
-        }
-
-        h1 {
-            font-size: 1.8rem;
-        }
-
-        h2 {
-            font-size: 1.4rem;
-        }
-
-        .stButton > button {
-            width: 100%;
-        }
-
-        div[data-testid="stMetric"] {
-            padding: 0.8rem;
-        }
-    }
+}
 
 </style>
 """
+
+
+    
+
+
+
 
 
 def apply_premium_style() -> None:
